@@ -2,3 +2,4 @@
 [Bb]in/
 obj/
 [Dd]ebug*/
+.DS_Store
