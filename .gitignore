@@ -3,3 +3,6 @@
 obj/
 [Dd]ebug*/
 .DS_Store
+notebooks/data
+notebooks/cifar_net.pth
+.ipynb_checkpoints/
