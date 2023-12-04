@@ -1,7 +1,7 @@
-Open In Colab
+Open In Colab (No additional Github steps required)
   - https://colab.research.google.com/github/garnold2020/HITL-Art/blob/main/src/Bias_Benchmarking.ipynb
     
-Weekly Meeting Minutes, etc. (Request Access)
+Weekly Meeting Minutes, Survey, etc. (Request Access)
   - https://drive.google.com/drive/folders/1WLycaqx58UtYXURz1CrHp3XcY_dej7Am?usp=share_link
 
 Task Tracking
