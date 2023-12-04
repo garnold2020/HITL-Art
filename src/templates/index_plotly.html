@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Investigator & Regenerator</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .input-container {
+            display: flex;
+            align-items: center;
+            padding: 25px;
+        }
+        .user-input {
+            width: 1500px;
+            overflow-x: auto;
+        }
+        #plot {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="plot"></div>
+    <div id="largeImageContainer" style="position: absolute; display: none;"></div>
+    <div class="input-container"> 
+        <textarea class="user-input" id="userInput" placeholder="Click points to regenerate" readonly></textarea>
+        <button id="clearButton" class="submit-button" onclick="clearInput()">Clear Input</button>
+        <button id="regenerateButton" class="submit-button" onclick="regenerateData()">Regenerate and Go Home</button>
+    </div>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        let regen_in_progress = false;
+
+        // Assume that the plot data is sent from the server
+        var plotData = {{ plot_data|safe }};
+
+        // Create Plotly plot with the received data
+        Plotly.newPlot('plot', plotData, {}, {hovermode: 'closest', hoverdistance: 13});
+
+        // Create a container for the larger image
+        var largeImageContainer = document.getElementById('largeImageContainer');
+
+        document.addEventListener("DOMContentLoaded", init);
+        function init() {
+            const submitButton = document.getElementById('regenerateButton');
+            submitButton.classList.add('active');
+            submitButton.disabled = false;
+
+            const clearButton = document.getElementById('clearButton');
+            clearButton.classList.add('active');
+            clearButton.disabled = false;
+        }
+
+        var plotDiv = document.getElementById('plot');
+        plotDiv.on('plotly_hover', function (data) {
+            var point = data.points[0];
+            
+            // Check if custom data is defined
+            if (point.customdata) {
+                var imageUrl = point.customdata[0];
+
+                // Calculate the position based on the hover event coordinates
+                var x = data.event.x - 10; // Adjust as needed
+                var y = data.event.y + 80; // Adjust as needed
+
+                // Display the larger image at the calculated position
+                showLargeImage(imageUrl, x, y);
+            }
+        });
+
+        // Handle plotly_unhover event to hide the larger image
+        plotDiv.on('plotly_unhover', function () {
+            hideLargeImage();
+        });
+
+        // Handle plotly_click event to update the user input
+        plotDiv.on('plotly_click', function (data) {
+            var point = data.points[0];
+
+            // Check if path is defined
+            if (point.hovertext) {
+                var imagePath = point.hovertext;
+                var userInput = document.getElementById('userInput');
+                var userInputValue = userInput.value;
+
+                // Use the parseUserInput function to get an array of quoted text
+                var inputArray = parseUserInput(userInputValue);
+
+                // Check if the imagePath already exists in the array
+                var index = inputArray.indexOf(imagePath);
+
+                // If the imagePath is already present, remove it; otherwise, add it
+                if (index !== -1) {
+                    inputArray.splice(index, 1);
+                } else {
+                    // Add imagePath to the end of the array
+                    inputArray.push(imagePath);
+                }
+
+                // Remove any empty strings from the array
+                inputArray = inputArray.filter(function(item) {
+                    return item !== '';
+                });
+
+                // Update the userInput value with the modified array
+                userInput.value = inputArray.map(function(item) {
+                    return '"' + item + '"';
+                }).join(', ');
+            }
+        });
+
+        function showLargeImage(imageUrl, x, y) {
+            largeImageContainer.innerHTML = `<img src="${imageUrl}" width="300" height="300" style="display: block;">`;
+            largeImageContainer.style.left = x + 'px';
+            largeImageContainer.style.top = y + 'px';
+            largeImageContainer.style.display = 'block';
+        }
+
+        // Function to hide the larger image
+        function hideLargeImage() {
+            largeImageContainer.innerHTML = '';
+            largeImageContainer.style.display = 'none';
+        }
+
+        async function regenerateData() {
+            try {
+                const submitButton = document.getElementById('regenerateButton');
+                regen_in_progress = true;
+                submitButton.classList.remove('active');
+                submitButton.disabled = true;
+
+                var response = await fetch(`/regenerate?list=${encodeURIComponent(parseUserInput(userInput.value).join('-;'))}`, { method: 'POST' });
+
+                // Check if the response indicates success
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    // Handle the result as needed (e.g., show an error message)
+                    console.error('Error regenerating data. Response status:', response.status, 'Message:');
+                    regen_in_progress = false;
+                }
+            } catch (error) {
+                console.error('Error in image regen:', error);
+                regen_in_progress = false;
+            }
+        }
+
+        async function clearInput() {
+            document.getElementById('userInput').value = '';
+        }
+
+        function parseUserInput(userInput) {
+            // Use a regular expression to match text within double quotes
+            const regex = /"([^"]*)"/g;
+            const matches = [];
+
+            // Iterate over matches and push the captured text into the array
+            let match;
+            while ((match = regex.exec(userInput)) !== null) {
+                matches.push(match[1]);
+            }
+
+            // If there are no matches, add the entire userInput as a single element
+            if (matches.length === 0) {
+                matches.push(userInput);
+            }
+
+            return matches;
+        }
+
+    </script>
+</body>
+</html>

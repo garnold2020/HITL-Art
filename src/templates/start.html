@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Cluster Association Testing</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+
+<body>
+    <div class="container">
+        <h1 class="title">Image Cluster Association Testing</h1>
+        <p>Select AI image generator(s), then enter a prompt, or multiple prompts "in quotes"</p>
+        <div class="model-buttons" id="model-buttons-container">
+        </div>
+        <div class="multi-prompt-container" id="multi-prompt-container">
+        </div>
+    </div>
+</body>
+    
+<script type="text/javascript">
+    let modelList = []
+    let selectedModels = new Set();
+    let loadingActive = false;
+
+    window.addEventListener('load', onLoad);
+    function onLoad() {
+        fetchModels().then(() => {
+            updateContent();
+        });
+    }
+
+    // Fetch models from the Flask route
+    async function fetchModels() {
+        try {
+            const response = await fetch('/get_models');
+            if (response.ok) {
+                modelList = await response.json();
+
+                // Create buttons for each model
+                const modelButtonsContainer = document.getElementById('model-buttons-container');
+                modelList.forEach(model => {
+                    const button = document.createElement('button');
+                    button.className = 'model-button';
+                    button.textContent = model;
+                    button.name = model;
+                    button.addEventListener('click', () => toggleModel(model));
+                    modelButtonsContainer.appendChild(button);
+                });
+            } else {
+                console.error('Error fetching models. Response status:', response.status);
+            }
+        } catch (error) {
+            console.error('Error fetching models:', error);
+        }
+    }
+
+
+    async function toggleModel(modelName) {
+        if (selectedModels.has(modelName)) {
+            // Deselect the model
+            if (selectedModels.size >= 2) {
+                selectedModels.delete(modelName);
+            }
+        } else {
+            // Select the model
+            selectedModels.add(modelName);
+        }
+
+        updateModelButtonsStyle();
+        await updateContent();
+        updateSubmitButtonsStyle();
+        fillAllDropdowns();
+    }
+
+
+    async function updateContent() {
+        const multiPromptContainer = document.getElementById('multi-prompt-container');
+        const leftSingleModelColumnExists = document.getElementById('content-left');
+
+        //When transitioning from one screen to another
+        if ((selectedModels.size === 2 && leftSingleModelColumnExists) || (selectedModels.size <= 1)) {
+            multiPromptContainer.innerHTML = ''; // Clear previous content
+        }
+
+        if (selectedModels.size === 1) {
+            // If one model is selected, use the multi-prompt container
+            await refreshMultiPromptContainer();
+            updateClusterList();
+
+        } else if (selectedModels.size >= 2) {
+            // If two or more models are selected, create columns for each
+            const existingColumns = multiPromptContainer.querySelectorAll('.content');
+            const existingModels = new Set(
+                Array.from(existingColumns).map(column => column.id.replace('content-', ''))
+            );
+
+            // Remove any existing columns that are not in the selected models
+            const columnsToRemove = Array.from(existingModels).filter(model => !selectedModels.has(model));
+            columnsToRemove.forEach(modelName => {
+                const columnToRemove = document.getElementById(`content-${modelName}`);
+                if (columnToRemove) {
+                    multiPromptContainer.removeChild(columnToRemove);
+                }
+            });
+
+            modelList.forEach(model => {
+                if (selectedModels.has(model)) {
+                    const existingColumn = document.getElementById(`content-${model}`);
+                    if (existingColumn) {
+                        multiPromptContainer.appendChild(existingColumn);
+                    } else {
+                        const column = createMultiModelContentSection(model);
+                        multiPromptContainer.appendChild(column);
+                    }
+                }
+            });
+        }
+    }
+
+    function selectDropdown(columnIdentifier) {
+        const dropdown = document.getElementById(`dropdown-${columnIdentifier}`);
+        const selectedOption = dropdown.options[dropdown.selectedIndex].value;
+        if (selectedOption) {
+            // Get the corresponding user input field
+            const userInputField = document.getElementById(`userInput-${columnIdentifier}`);
+            
+            // Append the selected option to the user input on a new line
+            userInputField.value += userInputField.value ?  '\n"'  + selectedOption + '"' : '"' + selectedOption + '"';
+        }
+    }
+
+
+
+
+    async function get_precomputes(modelName) {
+        // Initialize the result as an empty array
+        let result = [];
+        try {
+            const response = await fetch(`/get_dropdown_options?model=${modelName}`);
+            if (response.ok) {
+                const data = await response.json();
+                result = data.options;
+            } else {
+                console.error('Error fetching dropdown options. Response status:', response.status);
+            }
+        } catch (error) {
+            console.error('Error fetching dropdown options:', error);
+        }
+
+        return result;
+    }
+
+
+    async function fillAllDropdowns() {
+    try {
+        if (selectedModels.size === 1) {
+            const columnIdentifiers = ['left', 'center', 'right'];
+            const modelName = selectedModels.values().next().value;
+            const options = await get_precomputes(modelName);
+
+            for (const columnIdentifier of columnIdentifiers) {
+                const dropdown = document.getElementById(`dropdown-${columnIdentifier}`);
+
+                // Clear previous options
+                dropdown.innerHTML = '<option value="">Optionally Select a Pre-Computed Prompt</option>';
+
+                if (Array.isArray(options)) {
+                    options.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option;
+                        optionElement.textContent = option;
+                        dropdown.appendChild(optionElement);
+                    });
+                } else {
+                    console.error('Options is not an array:', options);
+                }
+            }
+
+        } else {
+            const columnIdentifiers = [...selectedModels.values()];
+
+            for (const columnIdentifier of columnIdentifiers) {
+                const options = await get_precomputes(columnIdentifier);
+                const dropdown = document.getElementById(`dropdown-${columnIdentifier}`);
+
+                // Clear previous options
+                dropdown.innerHTML = '<option value="">Select >= 1 Pre-computed Prompt</option>';
+
+                if (Array.isArray(options)) {
+                    options.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option;
+                        optionElement.textContent = option;
+                        dropdown.appendChild(optionElement);
+                    });
+                } else {
+                    console.error('Options is not an array:', options);
+                }
+            }
+            }
+        } catch (error) {
+            console.error('Error filling dropdowns:', error);
+            // Handle errors if necessary
+        }
+    }
+
+
+
+    function submitForm(columnIdentifier) {
+
+        if (selectedModels.size === 0) {
+            // Handle the case where no model is selected
+            const errorMsg = document.getElementById(`error-msg-${columnIdentifier}`);
+            errorMsg.style.display = 'block';
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+            }, 2000);
+            return;
+        } else {
+            fetchImageWithTimeout(columnIdentifier);
+        }
+    }
+
+    function parseUserInput(userInput) {
+        // Use a regular expression to match text within double quotes
+        const regex = /"([^"]*)"/g;
+        const matches = [];
+
+        // Iterate over matches and push the captured text into the array
+        let match;
+        while ((match = regex.exec(userInput)) !== null) {
+            matches.push(match[1]);
+        }
+
+        // If there are no matches, add the entire userInput as a single element
+        if (matches.length === 0) {
+            matches.push(userInput);
+        }
+
+        return matches;
+    }
+
+
+    function updateSubmitButtonsStyle() {
+        const submitButtons = document.querySelectorAll('.submit-button');
+        
+        if (!loadingActive && selectedModels.size > 0) {
+                submitButtons.forEach(button => {
+                button.classList.add('active');
+                button.disabled = false;
+            });
+        } else {
+                submitButtons.forEach(button => {
+                button.classList.remove('active');
+                button.disabled = true;
+            });
+        }
+        
+    }
+
+    function updateModelButtonsStyle() {
+        const modelButtons = document.querySelectorAll('.model-button');
+        
+        modelButtons.forEach(button => {
+            if (selectedModels.has(button.name)) {
+                button.classList.add('selected');
+            } else {
+                button.classList.remove('selected');
+            }
+        });
+    }
+
+
+    async function fetchTrendPlot() {
+        try {
+            model = selectedModels.values().next().value;
+            // These must be in order to get the proper trend plot
+            const inputLeft     = parseUserInput(document.getElementById(`userInput-left`).value);
+            const inputCenter   = parseUserInput(document.getElementById(`userInput-center`).value);
+            const inputRight    = parseUserInput(document.getElementById(`userInput-right`).value);
+            const precomputes = await get_precomputes(model);
+            let valid_inputs = true;
+
+            const validateInput = (input) => {
+                return input.length === 1 && precomputes.includes(input[0]);
+            };
+
+            if (!validateInput(inputLeft) || !validateInput(inputCenter) || !validateInput(inputRight)) {
+                valid_inputs = false;
+                const errorMsg = document.getElementById(`error-msg-trend`);
+                errorMsg.style.display = 'block';
+                setTimeout(() => {
+                    errorMsg.style.display = 'none';
+                }, 2000);
+            }
+
+            if (!loadingActive && valid_inputs) {
+                loadingActive = true;
+                updateSubmitButtonsStyle();
+                const loadingcontainer = document.getElementById(`trend-loading-container`);
+                loadingcontainer.style.display = 'block'; // Display the loading animation
+
+                const imageElement = document.getElementById(`trend-image`);
+                imageElement.style.display = 'none'; // Hide the image
+
+                const response = await fetch(`/get_trend_image?model=${model}&inputLeft=${encodeURIComponent(inputLeft)}&inputCenter=${encodeURIComponent(inputCenter)}&inputRight=${encodeURIComponent(inputRight)}`);
+                const data = await response.json();
+
+                if (data.image_data) {
+                    const image_data = document.getElementById('trend-image');
+                    image_data.src = `data:image/png;base64,${data.image_data}`;
+                    image_data.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            // Handle errors if necessary
+        } finally {
+                const loadingcontainer = document.getElementById(`trend-loading-container`);
+                loadingcontainer.style.display = 'none';
+                loadingActive = false;
+                updateSubmitButtonsStyle();
+        }
+    }
+
+    async function checkPromptsPrecomputed(prompts, modelName) {
+        const precomputes = await get_precomputes(modelName);
+        return prompts.every(prompt => precomputes.includes(prompt));
+    }
+
+    async function investigateImages(columnIdentifier) {
+        // Extract prompts from the user input fields
+        let model;
+        if (selectedModels.size === 1) {
+            model = selectedModels.values().next().value;
+        } else {
+            model = columnIdentifier;
+        }
+
+        const userInput = document.getElementById(`userInput-${columnIdentifier}`).value;
+        const prompts = parseUserInput(userInput);
+
+        let promptsPrecomputed = await checkPromptsPrecomputed(prompts, model);
+
+        if (!loadingActive && promptsPrecomputed) {
+            try {
+                loadingActive = true;
+                updateSubmitButtonsStyle();
+                
+                var response = await fetch(`/investigate_images?model=${model}&input=${encodeURIComponent(prompts.join('-;'))}`, { method: 'POST' })
+                if (response.redirected) {
+                    loadingActive = false;
+                    updateSubmitButtonsStyle();
+                    window.open(response.url, '_blank');
+                } else {
+                    // Handle the result as needed (e.g., show an error message)
+                    console.error('Error redirecting. Response status:', response.status);
+                }
+            } catch (error) {
+                console.error(error);
+                // Handle errors if necessary
+            }
+        } else {
+            console.error('Prompts must be precomputed to explore');
+        }
+    }
+
+
+    async function fetchImageWithTimeout(columnIdentifier) {
+        const timeoutDuration = 20 * 60 * 1000; // 20 minutes in milliseconds
+        const startTime = Date.now();
+
+        let model;
+        if (selectedModels.size === 1) {
+            model = selectedModels.values().next().value;
+        } else {
+            model = columnIdentifier;
+        }
+
+        const userInput = document.getElementById(`userInput-${columnIdentifier}`).value;
+        const prompts = parseUserInput(userInput);
+
+        let promptsPrecomputed = true;
+        if (prompts.length > 1) { //Don't bother to compute if 1 prompt
+            promptsPrecomputed = await checkPromptsPrecomputed(prompts, model);
+        }
+
+        // Start the asynchronous image fetching process
+        if (!loadingActive && (prompts.length === 1 || promptsPrecomputed)) {
+
+            const loadingContainer = document.querySelector(`#content-${columnIdentifier} .loading-container`);
+            loadingActive = true;
+            loadingContainer.style.display = 'block'; // Display the loading animation
+
+            updateSubmitButtonsStyle();
+
+            const imageElement = document.getElementById(`image-${columnIdentifier}`);
+            imageElement.style.display = 'none'; // Hide the image
+
+            await fetchImage();
+        } else {
+            const errorMsg = document.getElementById(`error-msg-${columnIdentifier}`);
+            errorMsg.style.display = 'block';
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+            }, 2000);
+            return;
+        }
+
+        async function fetchImage() {
+            try {
+                const response = await fetch(`/get_image?model=${model}&input=${encodeURIComponent(prompts.join('-;'))}`);
+                const data = await response.json();
+
+                if (data.image_data) {
+                    const imageElement = document.getElementById(`image-${columnIdentifier}`);
+                    imageElement.style.display = 'block';
+                    imageElement.src = `data:image/png;base64,${data.image_data}`;
+                    return;
+                }
+
+                if (Date.now() - startTime >= timeoutDuration) {
+                    console.log('Timeout: Image not found within 20 minutes');
+                    return;
+                }
+
+                // Delay and retry
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                await fetchImage();
+            } catch (error) {
+                console.error(error);
+                // Handle errors if necessary
+            } finally {
+                const loadingContainer = document.querySelector(`#content-${columnIdentifier} .loading-container`);
+                loadingContainer.style.display = 'none';
+                loadingActive = false;
+                updateSubmitButtonsStyle();
+        
+            }
+        }
+
+    }
+
+    function createSingleModelContentSection(id, header) {
+        const content = document.createElement('div');
+        content.className = 'content';
+        content.id = `content-${id}`;
+
+        // Append other elements as necessary
+        content.innerHTML = `
+                <div class="prompt-styles">
+                    ${header}:
+                </div>
+                <div class="dropdown-container">
+                    <select class="dropdown" id="dropdown-${id}" onchange="selectDropdown('${id}')">
+                        <option value="">Optionally Select Pre-Computed Prompt(s)</option>
+                    </select>
+                </div>
+                <div class="input-container">
+                    <span>High-quality photo of a</span>
+                        <textarea class="user-input" id="userInput-${id}" placeholder="{attributes} {profession}"></textarea>
+                    <span> person</span>
+                </div>
+                <button class="submit-button" id="submitButton-${id}" onclick="submitForm('${id}')">Submit</button>
+                <p id="error-msg-${id}" class="error-message">Must select a model first and multi-prompt submissions must be pre-computed</p>
+                <p id="timeout-msg-${id}" class="error-message">Timed out. Come back later for the 'pre-computed' result.</p>
+                <div class="image-container">
+                    <img id="image-${id}" alt="Image">
+                    <div class="loading-container">
+                        <div class="lds-roller">
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+                <button class="submit-button" id="investigate-${id}" onclick="investigateImages('${id}')">Investigate Images</button>
+            `;
+        return content;
+    }
+
+    function createTrendContainer() {
+        const trendContainer = document.createElement('div');
+        trendContainer.className = 'trend-container';
+        trendContainer.innerHTML = `
+                        <button class="submit-button" id="getTrendPlotButton" onclick="fetchTrendPlot()">Get Trend Plot</button>
+                        <div class="text-container">
+                            <p>The Gini coefficient ranges from 0 to 1, where 0 is 'there was equal representation in all the bins' and 1 is 'everything was in one bin'.</p>
+                        </div>
+                        <p id="error-msg-trend" class="error-message">Usage: Exactly one pre-computed prompt per input</p>
+                        <div class="image-container">
+                            <img id="trend-image" alt="Trend Plot">
+                            <div class="trend-loading-container" id="trend-loading-container">
+                                <div class="lds-roller">
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                    <div></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+        return trendContainer;
+    }
+
+    function createKeyContainer() {
+        let modelName;
+        if (selectedModels.size === 1) {
+            modelName = selectedModels.values().next().value;
+            const keyContainer = document.createElement('div');
+            keyContainer.className = 'text-container';
+            keyContainer.innerHTML = `
+                <h2>Cluster Key (Name : Description)</h2>
+                <ul class="cluster-list"></ul>
+                <button class="submit-button" id="investigateClusters" onclick="submitSelectedClusters()">Investigate Clusters</button>
+                <p id="clusters-error-msg" class="error-message">Must select 1 to 3 clusters to investigate</p>
+            `;
+            return keyContainer;
+        } else {
+            console.error('Wrong number of models to create cluster key');
+            return;
+        }
+
+    }
+
+    function createDisclaimerContainer(){
+        const disclaimerContainer = document.createElement('div');
+        disclaimerContainer.className = 'text-container';
+        disclaimerContainer.innerHTML = `
+            <h2>Bias Warning</h2>
+            <p>AI generators utilized may produce biased, inaccurate results. Outputs should be approached with caution, recognizing inherent biases present in generative models.</p>
+        `;
+        return disclaimerContainer;
+
+    }
+
+    async function updateClusterList() {
+        try {
+            model = selectedModels.values().next().value;
+            const response = await fetch(`/get_cluster_data?model_name=${model}`);
+            if (response.ok) {
+                const data = await response.json();
+                const clusterList = document.querySelector('.cluster-list');
+                clusterList.innerHTML = ''; // Clear previous content
+
+                for (const cluster in data) {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'cluster-item';
+
+                    // Create checkbox
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'selectedClusters';
+                    checkbox.value = cluster;
+
+                    // Create text content
+                    const textContent = document.createTextNode(`${cluster}: ${data[cluster]}`);
+
+                    // Append checkbox and text content to list item
+                    listItem.appendChild(checkbox);
+                    listItem.appendChild(textContent);
+
+                    // Append list item to cluster list
+                    clusterList.appendChild(listItem);
+                }
+
+            } else {
+                console.error('Error fetching cluster data. Response status:', response.status);
+            }
+        } catch (error) {
+            console.error('Error fetching cluster data:', error);
+        }
+    }
+
+    async function submitSelectedClusters() {
+        const selectedCheckboxes = document.querySelectorAll('input[name="selectedClusters"]:checked');
+        
+        if (!loadingActive) {
+                loadingActive = true;
+                updateSubmitButtonsStyle();
+                
+                if (selectedModels.size === 1 && selectedCheckboxes.length > 0 && selectedCheckboxes.length < 4) {
+                    model = selectedModels.values().next().value;
+                    const selectedClusters = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+                    
+                    try {
+                        var response = await fetch(`/investigate_images?model=${model}&input=${encodeURIComponent(selectedClusters.join('-;'))}`, { method: 'POST' });
+                        if (response.redirected) {
+                            loadingActive = false;
+                            updateSubmitButtonsStyle();
+                            window.open(response.url, '_blank');
+                        } else {
+                            console.error('Error redirecting. Response status:', response.status);
+                        }
+                    } catch (error) {
+                        console.error(error);
+                    }
+                    
+                } else {
+                    const errorMsg = document.getElementById(`clusters-error-msg`);
+                    errorMsg.style.display = 'block';
+                    setTimeout(() => {
+                        errorMsg.style.display = 'none';
+                    }, 2000);
+                    return;
+                }
+        }
+    }
+
+
+    function refreshMultiPromptContainer() {
+        const multiPromptContainer = document.getElementById('multi-prompt-container');
+        multiPromptContainer.innerHTML = ``;
+
+        const contentLeft   = createSingleModelContentSection('left', "Anti-bias prompt feedback; we suggest 'showing diverse {attributes which demonstrated bias in neutral prompt} representation'");
+        const contentCenter = createSingleModelContentSection('center', "Neutral prompt");
+        const contentRight  = createSingleModelContentSection('right', "Reinforced bias prompt feedback; we suggest 'showing {attributes which demonstrated bias in neutral prompt}'");
+    
+
+        const disclaimerContainer = createDisclaimerContainer();
+        contentLeft.appendChild(disclaimerContainer);
+
+        const trendContainer = createTrendContainer();
+        contentCenter.appendChild(trendContainer);
+
+        const keyContainer = createKeyContainer();
+        contentRight.appendChild(keyContainer);
+
+        multiPromptContainer.appendChild(contentLeft);
+        multiPromptContainer.appendChild(contentCenter);
+        multiPromptContainer.appendChild(contentRight);
+        
+    }
+
+
+    function createMultiModelContentSection(modelName) {
+        // Create a content container for the selected model
+        const modelContent = document.createElement('div');
+        modelContent.className = 'content';
+        modelContent.id = `content-${modelName}`;
+
+        // Customize the content as needed
+        modelContent.innerHTML = `
+            <div>
+                <h2>${modelName}</h2>
+            </div>
+            <div class="dropdown-container">
+                <select class="dropdown" id="dropdown-${modelName}" onchange="selectDropdown('${modelName}')">
+                    <option value="">Select >= 1 Pre-computed Prompt(s)</option>
+                </select>
+            </div>
+            <div class="input-container">
+                <span>High-quality photo of a</span>
+                    <textarea class="user-input" id="userInput-${modelName}" placeholder="{attributes} {profession}"></textarea>
+                <span> person</span>
+            </div>
+            <button class="submit-button" id="submitButton-${modelName}" onclick="submitForm('${modelName}')">Submit to ${modelName}</button>
+            <p id="error-msg-${modelName}" class="error-message">Must select a model first and multi-prompt submissions must be pre-computed</p>
+            <p id="timeout-msg-${modelName}" class="error-message">Timed out. Come back later for the 'precomputed' result.</p>
+            <div class="image-container">
+                <img id="image-${modelName}" alt="Image">
+                <div class="loading-container">
+                    <div class="lds-roller">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+            <button class="submit-button" id="investigate-${modelName}" onclick="investigateImages('${modelName}')">Investigate Images</button>
+        `;
+        return modelContent;
+
+    }
+</script>
+</html>
+
+
