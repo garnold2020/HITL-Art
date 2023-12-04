@@ -9,13 +9,13 @@ Task Tracking
 
 Folder Structure
 - **local_folder**
-  - **static** *Hosted on Github*
+  - **static** (*Hosted on Github*)
     - styles.css
-  - **templates** *Hosted on Github*
+  - **templates** (*Hosted on Github*)
     - start.html
     - index_plotly.html
   - **data** *Hosted on Azure*
-    - **prompt_filler_1** *E.g., "High quality photo of a \_ person"*
+    - **prompt_filler_1** (*E.g., "High quality photo of a \_ person"*)
       - **model_1**
         - **prompt_images**
           - prompt_1
