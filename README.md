@@ -1,6 +1,6 @@
 ## Open Bias Benchmarking In Colab
   - https://colab.research.google.com/github/garnold2020/HITL-Art/blob/main/src/Bias_Benchmarking.ipynb
-  - Open, insert ngrok auth token after [registering](https://dashboard.ngrok.com/login), scroll down to "Testing Section", click on it, click "Runtime" -> "Run before", click on outputted public ngrok url "\* Running on"
+  - Open, insert ngrok auth token after [registering for free](https://dashboard.ngrok.com/login), scroll down to "Testing Section", click on it, click "Runtime" -> "Run before", click on outputted public ngrok url "\* Running on"
     
 ## Weekly Meeting Minutes, Survey, etc. (Request Access)
   - https://drive.google.com/drive/folders/1WLycaqx58UtYXURz1CrHp3XcY_dej7Am?usp=share_link
@@ -8,7 +8,7 @@
 ## Task Tracking
   - See [Projects -> HITL-Art-Kanban](https://github.com/users/garnold2020/projects/2)
 
-## Folder Structure
+## Runtime Folder Structure
 - **local_folder**
   - **static** (*Hosted on Github*)
     - styles.css
