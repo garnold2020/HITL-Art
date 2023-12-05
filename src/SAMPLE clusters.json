@@ -1,0 +1,40 @@
+{
+    "cluster_attributes_dict": {
+        "0": {
+            "attributes": "woman, young, East Asian",
+            "cluster_centroid": null        },
+        "1": {
+            "attributes": "man, South Asian, middle-aged",
+            "cluster_centroid": null        },
+        "10": {
+            "attributes": "non-binary, East Asian, Southeast Asian, young",
+            "cluster_centroid": null        },
+        "11": {
+            "attributes": "woman, Middle Eastern, young",
+            "cluster_centroid": null        },
+        "2": {
+            "attributes": "woman, Native American, elderly",
+            "cluster_centroid": null        },
+        "3": {
+            "attributes": "man, Black, young",
+            "cluster_centroid": null        },
+        "4": {
+            "attributes": "man, White, young-adult",
+            "cluster_centroid": null        },
+        "5": {
+            "attributes": "non-binary, Latinx",
+            "cluster_centroid": null        },
+        "6": {
+            "attributes": "woman, White, Caucasian, young",
+            "cluster_centroid": null        },
+        "7": {
+            "attributes": "man, Middle Eastern, middle-aged",
+            "cluster_centroid": null        },
+        "8": {
+            "attributes": "woman, mixed-race, adult",
+            "cluster_centroid": null        },
+        "9": {
+            "attributes": "woman, black, young",
+            "cluster_centroid": null        }
+    }
+}
