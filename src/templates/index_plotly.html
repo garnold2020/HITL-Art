@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Investigator & Regenerator</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .input-container {
+            display: flex;
+            align-items: center;
+            padding: 25px;
+        }
+        .user-input {
+            width: 1500px;
+            overflow-x: auto;
+        }
+        #plot {
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div id="plot"></div>
+    <div id="largeImageContainer" style="position: absolute; display: none;"></div>
+    <div class="input-container"> 
+        <textarea class="user-input" id="userInput" placeholder="Click points to regenerate" readonly></textarea>
+        <button id="clearButton" class="submit-button" onclick="clearInput()">Clear Input</button>
+        <button id="regenerateButton" class="submit-button" onclick="regenerateData()">Regenerate and Go Home</button>
+    </div>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        let regen_in_progress = false;
+
+        var plotData = {{ plot_data|safe }};
+
+        Plotly.newPlot('plot', plotData, {
+            xaxis: { title: 'Image Similarity' }, 
+            yaxis: { title: 'Image Similarity' }, 
+        }, {hovermode: 'closest', hoverdistance: 13});
+
+        // Create a container for the larger image
+        var largeImageContainer = document.getElementById('largeImageContainer');
+
+        document.addEventListener("DOMContentLoaded", init);
+        function init() {
+            const submitButton = document.getElementById('regenerateButton');
+            submitButton.classList.add('active');
+            submitButton.disabled = false;
+
+            const clearButton = document.getElementById('clearButton');
+            clearButton.classList.add('active');
+            clearButton.disabled = false;
+        }
+
+        var plotDiv = document.getElementById('plot');
+        plotDiv.on('plotly_hover', function (data) {
+            var point = data.points[0];
+            
+            if (point.customdata) {
+                var imageUrl = point.customdata[0];
+
+                var x = data.event.x - 10; 
+                var y = data.event.y + 80;
+
+                showLargeImage(imageUrl, x, y);
+            }
+        });
+
+        plotDiv.on('plotly_unhover', function () {
+            hideLargeImage();
+        });
+
+        plotDiv.on('plotly_click', function (data) {
+            var point = data.points[0];
+
+            if (point.hovertext) {
+                var imagePath = point.hovertext;
+                var userInput = document.getElementById('userInput');
+                var userInputValue = userInput.value;
+
+                // Use the parseUserInput function to get an array of quoted text
+                var inputArray = parseUserInput(userInputValue);
+
+                // Check if the imagePath already exists in the array
+                var index = inputArray.indexOf(imagePath);
+
+                // If the imagePath is already present, remove it; otherwise, add it
+                if (index !== -1) {
+                    inputArray.splice(index, 1);
+                } else {
+                    // Add imagePath to the end of the array
+                    inputArray.push(imagePath);
+                }
+
+                // Remove any empty strings from the array
+                inputArray = inputArray.filter(function(item) {
+                    return item !== '';
+                });
+
+                // Update the userInput value with the modified array
+                userInput.value = inputArray.map(function(item) {
+                    return '"' + item + '"';
+                }).join(', ');
+            }
+        });
+
+        function showLargeImage(imageUrl, x, y) {
+            largeImageContainer.innerHTML = `<img src="${imageUrl}" width="300" height="300" style="display: block;">`;
+            largeImageContainer.style.left = x + 'px';
+            largeImageContainer.style.top = y + 'px';
+            largeImageContainer.style.display = 'block';
+        }
+
+        // Function to hide the larger image
+        function hideLargeImage() {
+            largeImageContainer.innerHTML = '';
+            largeImageContainer.style.display = 'none';
+        }
+
+        async function regenerateData() {
+            try {
+                const submitButton = document.getElementById('regenerateButton');
+                regen_in_progress = true;
+                submitButton.classList.remove('active');
+                submitButton.disabled = true;
+
+                var response = await fetch(`/regenerate?list=${encodeURIComponent(parseUserInput(userInput.value).join('-;'))}`, { method: 'POST' });
+
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    console.error('Error regenerating data. Response status:', response.status, 'Message:');
+                    regen_in_progress = false;
+                }
+            } catch (error) {
+                console.error('Error in image regen:', error);
+                regen_in_progress = false;
+            }
+        }
+
+        async function clearInput() {
+            document.getElementById('userInput').value = '';
+        }
+
+        function parseUserInput(userInput) {
+            // Use a regex to match text within double quotes
+            const regex = /"([^"]*)"/g;
+            const matches = [];
+
+            // Iterate over matches and push the captured text into the array
+            let match;
+            while ((match = regex.exec(userInput)) !== null) {
+                matches.push(match[1]);
+            }
+
+            // If there are no matches, add the entire userInput as a single element
+            if (matches.length === 0) {
+                matches.push(userInput);
+            }
+
+            return matches;
+        }
+
+    </script>
+</body>
+</html>
