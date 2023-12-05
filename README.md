@@ -1,6 +1,5 @@
 ## Open Bias Benchmarking In Colab
   - https://colab.research.google.com/github/garnold2020/HITL-Art/blob/main/src/Bias_Benchmarking.ipynb
-  - No further action required in Github
   - Open, insert ngrok auth token after [registering](https://dashboard.ngrok.com/login), scroll down to "Testing Section", click on it, click "Runtime" -> "Run before", click on outputted public ngrok url "\* Running on"
     
 ## Weekly Meeting Minutes, Survey, etc. (Request Access)
@@ -16,7 +15,7 @@
   - **templates** (*Hosted on Github*)
     - start.html
     - index_plotly.html
-  - **data** *Hosted on Azure*
+  - **data** (*Hosted on Azure*)
     - **prompt_filler_1** (*E.g., "High quality photo of a \_ person"*)
       - **model_1**
         - **prompt_images**
